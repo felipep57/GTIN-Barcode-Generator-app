@@ -4,7 +4,8 @@ import tempfile
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
-from reportlab.graphics.barcode import eanbc
+from reportlab.graphics import renderPDF
+from reportlab.graphics.barcode import createBarcodeDrawing
 from reportlab.lib.colors import black, white
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
@@ -162,10 +163,9 @@ class LabelPDFBuilder:
         c.setFillColor(black)
 
         barcode_value = normalize_gtin_for_ean13(data["gtin"])
-        barcode = eanbc.Ean13BarcodeWidget(barcode_value)
-        bounds = barcode.getBounds()
-        b_width = bounds[2] - bounds[0]
-        b_height = bounds[3] - bounds[1]
+        barcode = createBarcodeDrawing("EAN13", value=barcode_value)
+        b_width = barcode.width
+        b_height = barcode.height
 
         target_w = box_w - 0.45 * inch
         target_h = box_h - 0.45 * inch
@@ -179,7 +179,7 @@ class LabelPDFBuilder:
         c.saveState()
         c.translate(draw_x, draw_y)
         c.scale(scale, scale)
-        barcode.drawOn(c, 0, 0)
+        renderPDF.draw(barcode, c, 0, 0)
         c.restoreState()
 
         c.showPage()
