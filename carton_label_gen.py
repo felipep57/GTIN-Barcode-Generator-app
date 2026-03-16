@@ -13,7 +13,6 @@ from reportlab.pdfgen import canvas
 
 
 APP_TITLE = "Carton Label Generator"
-PDF_FILENAME = "carton_label.pdf"
 
 
 # -----------------------------
@@ -287,8 +286,9 @@ class CartonLabelApp:
 
     def generate_temp_pdf(self) -> str:
         data = self.collect_data()
-        temp_dir = tempfile.gettempdir()
-        pdf_path = os.path.join(temp_dir, PDF_FILENAME)
+        temp_file = tempfile.NamedTemporaryFile(prefix="carton_label_", suffix=".pdf", delete=False)
+        pdf_path = temp_file.name
+        temp_file.close()
         builder = LabelPDFBuilder(pdf_path)
         builder.build(data)
         self.last_pdf_path = pdf_path
