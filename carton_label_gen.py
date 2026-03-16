@@ -170,18 +170,27 @@ class LabelPDFBuilder:
         target_w = 349.2
         target_h = 119.25
 
+        gtin_text_size = fit_text(c, barcode_value, "Helvetica-Bold", 13, 9, target_w)
+        gtin_text_space = gtin_text_size + 6
+
+        barcode_target_y = target_y + gtin_text_space
+        barcode_target_h = target_h - gtin_text_space
+
         scale_x = target_w / b_width
-        scale_y = target_h / b_height
+        scale_y = barcode_target_h / b_height
         scale = min(scale_x, scale_y)
 
         draw_x = target_x + (target_w - (b_width * scale)) / 2
-        draw_y = target_y + (target_h - (b_height * scale)) / 2
+        draw_y = barcode_target_y + (barcode_target_h - (b_height * scale)) / 2
 
         c.saveState()
         c.translate(draw_x, draw_y)
         c.scale(scale, scale)
         renderPDF.draw(barcode, c, 0, 0)
         c.restoreState()
+
+        c.setFont("Helvetica-Bold", gtin_text_size)
+        c.drawCentredString(target_x + (target_w / 2), target_y + 2, barcode_value)
 
         c.showPage()
         c.save()
