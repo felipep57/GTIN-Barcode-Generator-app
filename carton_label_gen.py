@@ -39,19 +39,30 @@ def ean13_check_digit_ok(gtin13: str) -> bool:
     return calc == check
 
 
-def normalize_gtin_for_ean13(gtin: str) -> str:
+def gtin14_check_digit_ok(gtin14: str) -> bool:
+    if not re.fullmatch(r"\d{14}", gtin14):
+        return False
+
+    digits = [int(d) for d in gtin14]
+    check = digits[-1]
+    body = digits[:-1]
+
+    total = 0
+    for idx, digit in enumerate(body):
+        total += digit * (3 if idx % 2 == 0 else 1)
+
+    calc = (10 - (total % 10)) % 10
+    return calc == check
+
+
+def normalize_gtin_for_itf14(gtin: str) -> str:
     raw = digits_only(gtin)
 
-    if len(raw) == 13 and ean13_check_digit_ok(raw):
+    if len(raw) == 14 and gtin14_check_digit_ok(raw):
         return raw
 
-    if len(raw) == 14 and raw.startswith("0"):
-        converted = raw[1:]
-        if ean13_check_digit_ok(converted):
-            return converted
-
     raise ValueError(
-        "GTIN must be a valid 13-digit GTIN or a 14-digit GTIN starting with 0 that converts to a valid EAN-13."
+        "GTIN must be a valid 14-digit GTIN for ITF-14."
     )
 
 
@@ -70,8 +81,8 @@ def fit_text(c: canvas.Canvas, text: str, font_name: str, max_size: int, min_siz
 class LabelPDFBuilder:
     def __init__(self, pdf_path: str):
         self.pdf_path = pdf_path
-        self.page_width = 8.5 * inch
-        self.page_height = 8.5 * inch
+        self.page_width = 6.0 * inch
+        self.page_height = 4.0 * inch
         self.margin = 0.35 * inch
         self.label_x = self.margin
         self.label_y = self.margin
@@ -82,99 +93,89 @@ class LabelPDFBuilder:
         c = canvas.Canvas(self.pdf_path, pagesize=(self.page_width, self.page_height))
         c.setTitle("Carton Label")
 
-        x = self.label_x
-        y = self.label_y
-        w = self.label_w
-        h = self.label_h
+        page_w = self.page_width
+        page_h = self.page_height
 
-        # Background
-        c.setFillColorRGB(0.95, 0.95, 0.95)
-        c.rect(x, y, w, h, stroke=0, fill=1)
+        def y_from_bottom_of_word(bottom_from_top: float, font_size: float) -> float:
+            return page_h - bottom_from_top + (font_size * 0.20)
+
         c.setFillColor(black)
 
-        pad = 0.28 * inch
-        left_x = x + pad
-        right_x = x + w - pad
-        top_y = y + h - pad
+        # Top row headings (template-based coordinates)
+        heading_size = 9.95
+        heading_y = y_from_bottom_of_word(36.9, heading_size)
+        c.setFont("Helvetica", heading_size)
+        c.drawString(36.2, heading_y, "VENDOR STK NO.")
+        c.drawString(324.4, heading_y, "PACK, UNITS")
 
-        # Top row headings
-        c.setFont("Helvetica", 16)
-        c.drawString(left_x, top_y, "VENDOR STK NO.")
-        c.drawRightString(right_x, top_y, "PACK, UNITS")
-
-        # Top row values
+        # Top row values (template-based coordinates)
         vendor = data["vendor_stk_no"].strip() or "-"
         pack_units = f"{data['pack'].strip()} {data['units'].strip()}".strip() or "-"
 
-        vendor_size = fit_text(c, vendor, "Helvetica", 48, 18, (w / 2) - pad)
-        pack_size = fit_text(c, pack_units, "Helvetica", 48, 18, (w / 2) - pad)
+        vendor_size = fit_text(c, vendor, "Helvetica", 28, 20, 270)
+        pack_size = fit_text(c, pack_units, "Helvetica", 28, 20, 80)
+        top_value_baseline = y_from_bottom_of_word(71.5, 28.07)
 
         c.setFont("Helvetica", vendor_size)
-        c.drawString(left_x, top_y - 0.6 * inch, vendor)
+        c.drawString(36.2, top_value_baseline, vendor)
 
         c.setFont("Helvetica", pack_size)
-        c.drawRightString(right_x, top_y - 0.6 * inch, pack_units)
+        c.drawRightString(404.9, top_value_baseline, pack_units)
 
-        # Description section
-        desc_title_y = top_y - 1.7 * inch
-        c.setFont("Helvetica", 16)
-        c.drawCentredString(x + w / 2, desc_title_y, "DESCRIPTION")
+        # Description section (template-based coordinates)
+        desc_heading_size = 9.95
+        desc_heading_y = y_from_bottom_of_word(83.4, desc_heading_size)
+        c.setFont("Helvetica", desc_heading_size)
+        c.drawCentredString(page_w / 2, desc_heading_y, "DESCRIPTION")
 
         description = data["description"].strip() or "-"
-        desc_max_width = w - (pad * 2)
-        desc_font = fit_text(c, description, "Helvetica-Bold", 28, 12, desc_max_width)
+        desc_font = fit_text(c, description, "Helvetica-Bold", 18, 12, 360)
+        desc_baseline = y_from_bottom_of_word(106.0, 18.11)
         c.setFont("Helvetica-Bold", desc_font)
-        c.drawCentredString(x + w / 2, desc_title_y - 0.45 * inch, description)
+        c.drawString(36.2, desc_baseline, description)
 
-        # Color / size row
-        row_title_y = desc_title_y - 1.25 * inch
-        c.setFont("Helvetica", 16)
-        c.drawString(left_x, row_title_y, "COLOR")
-        c.drawRightString(right_x, row_title_y, "SIZE, STYLE")
+        # Color / size row (template-based coordinates)
+        row_heading_size = 9.95
+        row_heading_y = y_from_bottom_of_word(117.9, row_heading_size)
+        c.setFont("Helvetica", row_heading_size)
+        c.drawString(36.2, row_heading_y, "COLOR")
+        c.drawString(324.4, row_heading_y, "SIZE, STYLE")
 
         color = data["color"].strip() or "-"
         size_style = data["size"].strip() or "-"
 
-        color_font = fit_text(c, color, "Helvetica", 42, 14, (w / 2) - pad)
-        size_font = fit_text(c, size_style, "Helvetica", 42, 14, (w / 2) - pad)
+        color_font = fit_text(c, color, "Helvetica", 24, 16, 250)
+        size_font = fit_text(c, size_style, "Helvetica", 24, 16, 80)
+        row_value_baseline = y_from_bottom_of_word(147.4, 24.14)
 
         c.setFont("Helvetica", color_font)
-        c.drawString(left_x, row_title_y - 0.55 * inch, color)
+        c.drawString(36.2, row_value_baseline, color)
 
         c.setFont("Helvetica", size_font)
-        c.drawRightString(right_x, row_title_y - 0.55 * inch, size_style)
+        c.drawRightString(395.8, row_value_baseline, size_style)
 
-        # Divider line
-        divider_y = y + 2.35 * inch
-        c.setLineWidth(5)
-        c.line(left_x, divider_y, right_x, divider_y)
+        # Divider line (template-based coordinates)
+        divider_y = page_h - 148.44
+        c.setLineWidth(4.5)
+        c.line(0, divider_y, page_w, divider_y)
 
-        # Barcode box
-        box_margin = 0.6 * inch
-        box_w = w - (box_margin * 2)
-        box_h = 1.55 * inch
-        box_x = x + (w - box_w) / 2
-        box_y = divider_y - 1.8 * inch
-
-        c.setFillColor(white)
-        c.setStrokeColor(black)
-        c.setLineWidth(10)
-        c.rect(box_x, box_y, box_w, box_h, stroke=1, fill=1)
-        c.setFillColor(black)
-
-        barcode_value = normalize_gtin_for_ean13(data["gtin"])
-        barcode = createBarcodeDrawing("EAN13", value=barcode_value)
+        barcode_value = normalize_gtin_for_itf14(data["gtin"])
+        barcode = createBarcodeDrawing("I2of5", value=barcode_value)
         b_width = barcode.width
         b_height = barcode.height
 
-        target_w = box_w - 0.45 * inch
-        target_h = box_h - 0.45 * inch
+        # Barcode area from template object bounds
+        target_x = 41.25
+        target_y = 6.0
+        target_w = 349.2
+        target_h = 119.25
+
         scale_x = target_w / b_width
         scale_y = target_h / b_height
         scale = min(scale_x, scale_y)
 
-        draw_x = box_x + (box_w - (b_width * scale)) / 2
-        draw_y = box_y + (box_h - (b_height * scale)) / 2
+        draw_x = target_x + (target_w - (b_width * scale)) / 2
+        draw_y = target_y + (target_h - (b_height * scale)) / 2
 
         c.saveState()
         c.translate(draw_x, draw_y)
@@ -235,8 +236,8 @@ class CartonLabelApp:
         frame.columnconfigure(1, weight=1)
 
         note = (
-            "Barcode rule: enter a valid 13-digit GTIN, or a 14-digit GTIN that starts with 0.\n"
-            "The app will convert GTIN-14 to EAN-13 when needed."
+            "Barcode rule: enter a valid 14-digit GTIN for ITF-14.\n"
+            "13-digit GTIN input is not accepted."
         )
         ttk.Label(frame, text=note, foreground="#555555").grid(
             row=8, column=0, columnspan=2, sticky="w", pady=(12, 18)
@@ -272,7 +273,7 @@ class CartonLabelApp:
         if missing:
             raise ValueError("Please complete all fields: " + ", ".join(missing))
 
-        normalize_gtin_for_ean13(data["gtin"])
+        normalize_gtin_for_itf14(data["gtin"])
         return data
 
     def generate_temp_pdf(self) -> str:
