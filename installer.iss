@@ -2,7 +2,7 @@
 ; Build with: ISCC installer.iss
 
 #define MyAppName "Carton Label Generator"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "FP Projects"
 #define MyAppExeName "carton_label_gen.exe"
 
@@ -15,13 +15,15 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=installer-output
-OutputBaseFilename=Carton-Label-Generator-Setup
+OutputBaseFilename=Carton-Label-Generator-Setup-{#MyAppVersion}
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
+CloseApplications=force
+RestartApplications=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

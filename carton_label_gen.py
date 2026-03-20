@@ -159,7 +159,15 @@ class LabelPDFBuilder:
         c.line(0, divider_y, page_w, divider_y)
 
         barcode_value = normalize_gtin_for_itf14(data["gtin"])
-        barcode = createBarcodeDrawing("I2of5", value=barcode_value)
+        barcode = createBarcodeDrawing(
+            "I2of5",
+            value=barcode_value,
+            checksum=0,
+            stop=1,
+            quiet=0,
+            bearers=0,
+            bearerBox=False,
+        )
         b_width = barcode.width
         b_height = barcode.height
 
@@ -187,6 +195,9 @@ class LabelPDFBuilder:
         c.scale(scale, scale)
         renderPDF.draw(barcode, c, 0, 0)
         c.restoreState()
+
+        c.setLineWidth(1)
+        c.rect(draw_x, draw_y, b_width * scale, b_height * scale, stroke=1, fill=0)
 
         c.setFont("Helvetica-Bold", gtin_text_size)
         c.drawCentredString(target_x + (target_w / 2), target_y + 2, barcode_value)
@@ -355,3 +366,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
